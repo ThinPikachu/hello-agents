@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Network Visualization</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            display: flex;
+            min-height: 100vh;
+            background: #f8f9fa;
+            font-family: Arial, sans-serif;
+        }
+        .sidebar {
+            width: 200px;
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px 0;
+            flex-shrink: 0;
+            min-height: 100vh;
+        }
+        .sidebar h2 {
+            font-size: 16px;
+            padding: 0 20px 16px;
+            border-bottom: 1px solid #3d5166;
+            margin-bottom: 8px;
+        }
+        .sidebar .menu-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+            border-left: 3px solid transparent;
+        }
+        .sidebar .menu-item:hover {
+            background: #34495e;
+        }
+        .sidebar .menu-item.active {
+            background: #34495e;
+            border-left-color: #4a90d9;
+            color: #fff;
+        }
+        .sidebar .menu-group-title {
+            padding: 12px 20px 6px;
+            font-size: 12px;
+            color: #95a5a6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+        .sidebar .menu-sub-item {
+            padding: 9px 20px 9px 36px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+            border-left: 3px solid transparent;
+        }
+        .sidebar .menu-sub-item:hover {
+            background: #34495e;
+        }
+        .sidebar .menu-sub-item.active {
+            background: #34495e;
+            border-left-color: #4a90d9;
+            color: #fff;
+        }
+        .main-content {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+        .page { display: none; }
+        .page.active { display: block; }
+        .controls {
+      background: #fff;
+            border-radius: 12px;
+            padding: 16px 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .controls label { font-size: 14px; color: #555; }
+        .controls input {
+            width: 220px; padding: 8px 12px;
+            border: 1px solid #ddd; border-radius: 6px; font-size: 14px;
+        }
+        .controls button {
+            padding: 8px 20px; background: #4a90d9; color: #fff;
+            border: none; border-radius: 6px; font-size: 14px;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .controls button:hover { background: #357abd; }
+        .hint { font-size: 12px; color: #999; margin-top: 4px; }
+        .canvas-area {
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+        canvas {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .info-panel {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            min-width: 300px;
+            max-width: 400px;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #333;
+        }
+        .info-panel h3 {
+            font-size: 16px;
+            margin-bottom: 12px;
+            color: #222;
+            border-bottom: 2px solid #4a90d9;
+            padding-bottom: 8px;
+        }
+        .info-panel .section { margin-bottom: 16px; }
+        .info-panel .section-title { font-weight: bold; color: #4a90d9; margin-bottom: 4px; }
+        .info-panel .formula {
+            background: #f5f5f5;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 4px 0;
+            overflow-x: auto;
+        }
+        .info-panel .highlight { color: #e63946; font-weight: bold; }
+        .legend { margin-top: 12px; font-size: 13px; color: #666; }
+        .placeholder {
+            background: #fff;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            text-align: center;
+            color: #999;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>深度学习可视化</h2>
+        <div class="menu-group-title">神经网络基础</div>
+        <div class="menu-sub-item active" onclick="switchPage('network', this)">基础结构</div>
+        <div class="menu-sub-item" onclick="switchPage('activation', this)">激活函数</div>
+        <div class="menu-sub-item" onclick="switchPage('forward', this)">前向传播</div>
+        <div class="menu-sub-item" onclick="switchPage('backward', this)">反向传播</div>
+        <div class="menu-group-title">卷积神经网络</div>
+        <div class="menu-sub-item" onclick="switchPage('conv', this)">卷积运算</div>
+        <div class="menu-sub-item" onclick="switchPage('cnn', this)">CNN基础结构</div>
+    </div>
+    <div class="main-content">
+        <!-- Page 1: 神经网络基础结构 -->
+        <div class="page active" id="page-network">
+            <div class="controls">
+                <div>
+                    <label>每层神经元数量：</label>
+                    <input type="text" id="layerInput" value="3,4,4,1" placeholder="例如: 3,4,4,1">
+                    <div class="hint">用逗号分隔每层的神经元个数</div>
+                </div>
+                <button onclick="renderNetwork()">生成网络</button>
+            </div>
+            <div class="canvas-area">
+                <canvas id="nn"></canvas>
+                <div class="info-panel" id="infoPanel"></div>
+            </div>
+            <div class="legend">连接线上的 w 表示权重(weight)，节点内的 b 表示偏置(bias)</div>
+        </div>
+        <!-- Page 2: 激活函数 -->
+        <div class="page" id="page-activation">
+            <div class="controls">
+                <label>选择激活函数：</label>
+                <select id="activationSelect" onchange="renderActivationPage()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                    <option value="sigmoid">Sigmoid</option>
+                    <option value="tanh">Tanh</option>
+                    <option value="relu">ReLU</option>
+                    <option value="leakyrelu">LeakyReLU</option>
+                </select>
+                <button id="actPlayBtn" onclick="toggleActivationAnim()">播放</button>
+                <button onclick="nextActivationStep()">下一步</button>
+                <button onclick="resetActivationAnim()">重置</button>
+            </div>
+            <div class="canvas-area">
+                <canvas id="activationCanvas"></canvas>
+                <div class="info-panel" id="activationInfo"></div>
+            </div>
+            <div class="legend">节点上半：z值(加权和)，下半：a值(激活后) | 柱状条显示激活函数的压缩/变换效果</div>
+        </div>
+        <!-- Page 3: 前向传播 -->
+        <div class="page" id="page-forward">
+            <div class="controls">
+                <label>激活函数：</label>
+                <select id="forwardActSelect" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                    <option value="sigmoid">Sigmoid</option>
+                    <option value="relu" selected>ReLU</option>
+                    <option value="tanh">Tanh</option>
+                </select>
+                <button id="fwdPlayBtn" onclick="toggleForwardAnim()">播放</button>
+                <button onclick="nextForwardStep()">下一步</button>
+                <button onclick="resetForwardAnim()">重置</button>
+            </div>
+            <div class="canvas-area">
+                <canvas id="forwardCanvas"></canvas>
+                <div class="info-panel" id="forwardInfo"></div>
+            </div>
+            <div class="legend">数据从输入层逐层向前传播：z = Σ(w·a) + b → a = f(z) | 箭头颜色深浅表示权重大小</div>
+        </div>
+        <!-- Page 4: 反向传播 -->
+        <div class="page" id="page-backward">
+            <div class="controls">
+                <label>激活函数：</label>
+                <select id="backwardActSelect" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                    <option value="sigmoid" selected>Sigmoid</option>
+                    <option value="relu">ReLU</option>
+                  <option value="tanh">Tanh</option>
+                </select>
+                <label style="margin-left:12px;">学习率：</label>
+                <input type="text" id="lrInput" value="0.1" style="width:60px;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                <button id="bwdPlayBtn" onclick="toggleBackwardAnim()">播放</button>
+                <button onclick="nextBackwardStep()">下一步</button>
+                <button onclick="resetBackwardAnim()">重置</button>
+            </div>
+            <div class="canvas-area">
+                <canvas id="backwardCanvas"></canvas>
+                <div class="info-panel" id="backwardInfo" style="max-height:560px;overflow-y:auto;"></div>
+            </div>
+            <div class="legend">梯度从输出层逐层向后传播：δ = ∂L/∂z | 红色连接=梯度大(更新多)，蓝色=梯度小</div>
+        </div>
+        <!-- Page 5: CNN卷积运算 -->
+        <div class="page" id="page-conv">
+            <div class="controls">
+                <button id="convPlayBtn" onclick="toggleConvAnim()">播放</button>
+                <button onclick="nextConvStep()">下一步</button>
+                <button onclick="resetConvAnim()">重置</button>
+            </div>
+            <div class="canvas-area">
+                <canvas id="convCanvas" style="flex:none;"></canvas>
+                <div class="info-panel" id="convInfo" style="flex:0 0 360px;max-height:none;overflow-y:auto;"></div>
+            </div>
+            <div class="legend">一条龙流程：红框=卷积核位置 | 蓝/黄=Conv输出 | 绿=ReLU修改 | 橙框=Pool窗口 | 黄=当前最大值</div>
+        </div>
+        <!-- Page 6: CNN基础结构 -->
+        <div class="page" id="page-cnn">
+            <div class="canvas-area" style="align-items:stretch;height:calc(100vh - 72px);">
+                <canvas id="cnnCanvas" style="flex:none;"></canvas>
+                <div class="info-panel" id="cnnInfo" style="flex:0 0 360px;max-height:none;overflow-y:auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchPage(name, el) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.menu-sub-item').forEach(m => m.classList.remove('active'));
+            document.getElementById('page-' + name).classList.add('active');
+            el.classList.add('active');
+            if (name === 'activation') renderActivation();
+            if (name === 'forward') renderForwardPage();
+            if (name === 'backward') renderBackwardPage();
+            if (name === 'conv') renderConvPage();
+            if (name === 'cnn') renderCNNPage();
+        }
+
+        const canvas = document.getElementById('nn');
+        const ctx = canvas.getContext('2d');
+
+        function getLayerColor(index, total) {
+            if (index === 0) return '#f9e6a0';
+            if (index === total - 1) return '#f5b8b8';
+            const midColors = ['#a8d4f0', '#b8e6b8', '#e0c4f0', '#f0d4a8', '#a8f0e0'];
+            return midColors[(index - 1) % midColors.length];
+        }
+
+        function getLayerName(index, total) {
+            if (index === 0) return 'input layer';
+            if (index === total - 1) return 'output layer';
+            return `hidden layer ${index}`;
+        }
+
+        function renderNetwork() {
+            const input = document.getElementById('layerInput').value.trim();
+         const neuronCounts = input.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0);
+            if (neuronCounts.length < 2) { alert('请至少输入2层'); return; }
+
+            const totalLayers = neuronCounts.length;
+            const maxNodes = Math.max(...neuronCounts);
+            const nodeRadius = Math.max(16, Math.min(30, 300 / maxNodes));
+            const canvasWidth = Math.max(700, totalLayers * 200 + 100);
+            const canvasHeight = Math.max(450, maxNodes * (nodeRadius * 2 + 30) + 160);
+
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+            const startX = 120, endX = canvasWidth - 120;
+            const topY = 70, bottomY = canvasHeight - 90;
+            const layerSpacing = totalLayers > 1 ? (endX - startX) / (totalLayers - 1) : 0;
+
+            function getPositions(nodeCount, layerIndex) {
+                const x = startX + layerIndex * layerSpacing;
+                const positions = [];
+                const totalHeight = bottomY - topY;
+                const spacing = nodeCount > 1 ? totalHeight / (nodeCount - 1) : 0;
+                const offsetY = nodeCount > 1 ? topY : (topY + bottomY) / 2;
+                for (let i = 0; i < nodeCount; i++) positions.push({ x, y: offsetY + i * spacing });
+                return positions;
+            }
+
+            const allPositions = neuronCounts.map((count, i) => getPositions(count, i));
+
+            let wIndex = 1;
+            for (let l = 0; l < allPositions.length - 1; l++) {
+                const fromLayer = allPositions[l], toLayer = allPositions[l + 1];
+                for (let i = 0; i < fromLayer.length; i++) {
+                    for (let j = 0; j < toLayer.length; j++) {
+                        const from = fromLayer[i], to = toLayer[j];
+                        const angle = Math.atan2(to.y - from.y, to.x -from.x);
+                        const sx = from.x + nodeRadius * Math.cos(angle);
+                        const sy = from.y + nodeRadius * Math.sin(angle);
+                        const ex = to.x - nodeRadius * Math.cos(angle);
+                        const ey = to.y - nodeRadius * Math.sin(angle);
+
+                        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
+                        ctx.strokeStyle = '#555'; ctx.lineWidth = 1.2; ctx.stroke();
+
+                        const arrowLen = 7, arrowAngle = 0.4;
+                        ctx.beginPath(); ctx.moveTo(ex, ey);
+                        ctx.lineTo(ex - arrowLen * Math.cos(angle - arrowAngle), ey - arrowLen * Math.sin(angle - arrowAngle));
+                        ctx.lineTo(ex - arrowLen * Math.cos(angle + arrowAngle), ey - arrowLen * Math.sin(angle + arrowAngle));
+                        ctx.closePath(); ctx.fillStyle = '#555'; ctx.fill();
+
+                        const t = 0.25 + 0.5 * (j / Math.max(1, toLayer.length - 1));
+                        const mx = sx + (ex - sx) * t, my = sy + (ey - sy) * t;
+                        const perpX = -Math.sin(angle) * 9, perpY = Math.cos(angle) * 9;
+                        ctx.font = '9px Arial'; ctx.fillStyle = '#e63946';
+                        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                        ctx.fillText('w' + wIndex, mx + perpX, my + perpY);
+                        wIndex++;
+                    }
+                }
+            }
+            const totalWeights = wIndex - 1;
+
+            let bIndex = 1;
+            for (let l = 0; l < allPositions.length; l++) {
+                const color = getLayerColor(l, totalLayers);
+                for (let i = 0; i < allPositions[l].length; i++) {
+                    const pos = allPositions[l][i];
+                    ctx.beginPath(); ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = color; ctx.fill();
+                    ctx.strokeStyle = '#888'; ctx.lineWidth = 1.5; ctx.stroke();
+                    ctx.font = `${Math.max(10, nodeRadius * 0.45)}px Arial`;
+                    ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('b' + bIndex, pos.x, pos.y);
+                    bIndex++;
+                }
+            }
+            const totalBiases = bIndex - 1;
+
+            ctx.fillStyle = '#333'; ctx.font = '14px Arial';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+            for (let l = 0; l < totalLayers; l++) {
+                const x = startX + l * layerSpacing;
+                ctx.fillText(getLayerName(l, totalLayers), x, bottomY + 45);
+            }
+
+            updateInfoPanel(neuronCounts, totalWeights, totalBiases);
+        }
+
+        function updateInfoPanel(neuronCounts, totalWeights, totalBiases) {
+            const panel = document.getElementById('infoPanel');
+            const totalLayers = neuronCounts.length;
+            let weightDetails = [], weightCalcParts = [];
+            for (let l = 0; l < totalLayers - 1; l++) {
+                const w = neuronCounts[l] * neuronCounts[l + 1];
+                weightDetails.push(`第${l+1}层→第${l+2}层: ${neuronCounts[l]} × ${neuronCounts[l+1]} = ${w}`);
+                weightCalcParts.push(`${neuronCounts[l]}×${neuronCounts[l+1]}`);
+            }
+            let html = `
+                <h3>参数统计</h3>
+                <div class="section"><div class="section-title">网络结构</div>
+                <div>${neuronCounts.join(' → ')}（共 ${totalLayers} 层）</div></div>
+                <div class="section"><div class="section-title">权重数量 (Weights)</div>
+                <div class="formula">${weightCalcParts.join(' + ')} = <span class="highlight">${totalWeights}</span></div>
+                <div style="font-size:12px;color:#666;margin-top:4px;">${weightDetails.join('<br>')}</div></div>
+                <div class="section"><div class="section-title">偏置数量 (Biases)</div>
+                <div class="formula">${neuronCounts.join(' + ')} = <span class="highlight">${totalBiases}</span></div></div>
+                <div class="section"><div class="section-title">总参数量</div>
+                <div class="formula">${totalWeights} + ${totalBiases} = <span class="highlight">${totalWeights + totalBiases}</span></div></div>
+                <div class="section"><div class="section-title">前向传播计算步骤</div>`;
+            for (let l = 0; l < totalLayers - 1; l++) {
+                html += `<div class="formula">Layer${l+2} = σ(W<sub>${l+1}</sub> · Layer${l+1} + B<sub>${l+1}</sub>)</div>`;
+                html += `<div style="font-size:12px;color:#666;">W<sub>${l+1}</sub>: ${neuronCounts[l+1]}×${neuronCounts[l]} 矩阵，B<sub>${l+1}</sub>: ${neuronCounts[l+1]}×1 向量</div>`;
+            }
+            html += `</div>`;
+            panel.innerHTML = html;
+        }
+
+        renderNetwork();
+
+    </script>
+    <script src="activation.js"></script>
+    <script src="forward.js"></script>
+    <script src="backward.js"></script>
+    <script src="conv.js"></script>
+    <script src="cnn.js"></script>
+</body>
+</html>
